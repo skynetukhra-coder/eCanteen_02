@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const axios = require("axios");
 
 exports.login = async (req, res) => {
     try {
@@ -110,6 +111,90 @@ exports.changePassword = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: error.message
+        });
+    }
+};
+
+exports.loginGoogle = async (req, res) => {
+    try {
+        console.log("Google Login Body:", req.body);
+        const { idToken } = req.body;
+        if (!idToken) {
+            return res.status(400).json({
+                success: false,
+                message: "ID Token is required"
+            });
+        }
+
+        // Verify token with Google API
+        const response = await axios.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+        const payload = response.data;
+
+        // Verify audience matches client ID
+        const expectedClientId = "979965796474-uojacq73meebj0uvb58n42325a184pp1.apps.googleusercontent.com";
+        if (payload.aud !== expectedClientId) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid client audience"
+            });
+        }
+
+        const email = payload.email;
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email not provided by Google account"
+            });
+        }
+
+        // Check if employee exists
+        const sql = "SELECT * FROM employee WHERE email = ?";
+        let [result] = await db.query(sql, [email]);
+
+        let user;
+        if (result.length === 0) {
+            // Auto register the user
+            const username = email.split('@')[0];
+            const role = (email.toLowerCase() === "skynet.ukhra@gmail.com") ? "ADMIN" : "EMPLOYEE";
+            const fullName = payload.name || username;
+            const profileImage = payload.picture || null;
+
+            await db.query(
+                "INSERT INTO employee (username, password, full_name, role, email, profile_image) VALUES (?, ?, ?, ?, ?, ?)",
+                [username, 'google_oauth_placeholder', fullName, role, email, profileImage]
+            );
+
+            // Fetch the newly created user
+            const [newResult] = await db.query("SELECT * FROM employee WHERE email = ?", [email]);
+            user = newResult[0];
+        } else {
+            user = result[0];
+            // Update profile image if Google has a fresh one and database has none
+            if (payload.picture && !user.profile_image) {
+                await db.query("UPDATE employee SET profile_image = ? WHERE employee_id = ?", [payload.picture, user.employee_id]);
+                user.profile_image = payload.picture;
+            }
+        }
+
+        return res.json({
+            success: true,
+            user: {
+                employee_id: user.employee_id,
+                username: user.username,
+                full_name: user.full_name,
+                role: user.role,
+                email: user.email,
+                mobile: user.mobile,
+                designation: user.designation,
+                profile_image: user.profile_image
+            }
+        });
+
+    } catch (error) {
+        console.error("GOOGLE LOGIN ERROR:", error.message);
+        return res.status(500).json({
+            success: false,
+            message: "Google Authentication Failed: " + error.message
         });
     }
 };
