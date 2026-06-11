@@ -230,10 +230,10 @@ router.get("/audit-logs", async (req, res) => {
                 action_name,
                 details,
                 severity,
+                created_at AS rawDate,
                 DATE_FORMAT(created_at, '%d-%m-%Y %h:%i %p') AS time
             FROM audit_logs
             ORDER BY log_id DESC
-            LIMIT 50
         `);
         res.json(rows);
     } catch (err) {

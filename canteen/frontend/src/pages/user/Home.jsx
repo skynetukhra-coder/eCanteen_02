@@ -26,6 +26,11 @@ function Home() {
   const [notifications, setNotifications] = useState([]);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState(null);
+  const [timeSlots, setTimeSlots] = useState({
+    breakfast: "06:00 AM - 10:00 AM",
+    lunch: "11:30 AM - 02:30 PM",
+    snacks: "04:00 PM - 06:00 PM"
+  });
 
   useEffect(() => {
     if (user?.username === "admin" && user?.employee_id) {
@@ -46,6 +51,15 @@ function Home() {
         })
         .catch(err => console.error("Error loading wallet balance:", err));
     }
+    axios.get("http://localhost:5000/api/menu/slots/all")
+      .then(res => {
+        const slots = {};
+        res.data.forEach(s => {
+          slots[s.category.toLowerCase()] = `${s.start_time} - ${s.end_time}`;
+        });
+        setTimeSlots(prev => ({ ...prev, ...slots }));
+      })
+      .catch(err => console.error("Error loading time slots:", err));
     fetchNotifications();
   }, [user?.employee_id, user?.username]);
 
@@ -57,7 +71,9 @@ function Home() {
       .catch(err => console.error("Error fetching notifications:", err));
   };
 
-  const lastViewedId = parseInt(localStorage.getItem("lastViewedNotifId") || "0");
+  const [lastViewedId, setLastViewedId] = useState(
+    parseInt(localStorage.getItem("lastViewedNotifId") || "0")
+  );
   const unreadCount = notifications.filter(n => n.id > lastViewedId).length;
 
   const openNotificationsModal = () => {
@@ -65,7 +81,46 @@ function Home() {
     if (notifications.length > 0) {
       const maxId = Math.max(...notifications.map(n => n.id));
       localStorage.setItem("lastViewedNotifId", String(maxId));
+      setLastViewedId(maxId);
     }
+  };
+
+  const isTimeInSlot = (slotStr) => {
+    if (!slotStr) return false;
+    const parts = slotStr.split("-");
+    if (parts.length !== 2) return false;
+    
+    const parseTimeString = (tStr) => {
+        const match = tStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!match) return null;
+        let [_, hours, minutes, modifier] = match;
+        let hrs = parseInt(hours, 10);
+        if (modifier.toUpperCase() === "PM" && hrs < 12) hrs += 12;
+        if (modifier.toUpperCase() === "AM" && hrs === 12) hrs = 0;
+        const d = new Date();
+        d.setHours(hrs, parseInt(minutes, 10), 0, 0);
+        return d;
+    };
+
+    const startTime = parseTimeString(parts[0]);
+    const endTime = parseTimeString(parts[1]);
+    if (!startTime || !endTime) return false;
+
+    const now = new Date();
+    if (endTime < startTime) {
+        endTime.setDate(endTime.getDate() + 1);
+    }
+    return now >= startTime && now <= endTime;
+  };
+
+  const handleMenuClick = (menu) => {
+    const isAdmin = user?.role === "ADMIN" || user?.username === "admin";
+    const slotStr = timeSlots[menu.title.toLowerCase()];
+    if (!isAdmin && slotStr && !isTimeInSlot(slotStr)) {
+        alert(`The ${menu.title} menu is only accessible between ${slotStr}. Current time is outside this slot.`);
+        return;
+    }
+    navigate(`/menu/${menu.title.toLowerCase()}`);
   };
 
   const menuItems = [
@@ -73,21 +128,21 @@ function Home() {
       id: 1,
       title: "Breakfast",
       item: "Poha + Tea",
-      time: "06:00 AM - 10:00 AM",
+      time: timeSlots.breakfast,
       image: breakfastImg,
     },
     {
       id: 2,
       title: "Lunch",
       item: "Rice + Dal + Paneer",
-      time: "11:30 AM - 02:30 PM",
+      time: timeSlots.lunch,
       image: lunchImg,
     },
     {
       id: 3,
       title: "Snacks",
       item: "Samosa + Tea",
-      time: "04:00 PM - 06:00 PM",
+      time: timeSlots.snacks,
       image: snacksImg,
     },
   ];
@@ -230,11 +285,7 @@ function Home() {
               <div
                 key={menu.id}
                 className="menu-card"
-                onClick={() =>
-                  navigate(
-                    `/menu/${menu.title.toLowerCase()}`
-                  )
-                }
+                onClick={() => handleMenuClick(menu)}
               >
                 <img
                   src={menu.image}

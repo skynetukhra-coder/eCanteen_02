@@ -156,7 +156,7 @@ function Coupon() {
                                             <button
                                                 className="download-btn"
                                                 style={{ padding: "10px 20px", display: "flex", alignItems: "center", gap: "8px", border: "none", borderRadius: "8px", cursor: "pointer" }}
-                                                onClick={() => window.print()}
+                                                onClick={() => handlePrint(coupon)}
                                             >
                                                 <FaDownload />
                                                 Print/Save Coupon

@@ -18,6 +18,88 @@ function MenuManagement({ searchQuery = "" }) {
     const [items, setItems] = useState([]);
     const [showModal, setShowModal] = useState(false);
 
+    // Dynamic slots configuration
+    const [slotsLoading, setSlotsLoading] = useState(true);
+    const [tempSlots, setTempSlots] = useState({
+        breakfast: { start_time: "", end_time: "" },
+        lunch: { start_time: "", end_time: "" },
+        snacks: { start_time: "", end_time: "" }
+    });
+
+    // Helper to convert 12-hour (e.g. "06:00 AM") to 24-hour (e.g. "06:00")
+    const convertTo24Hour = (timeStr) => {
+        if (!timeStr) return "";
+        const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!match) return "";
+        let [_, hours, minutes, modifier] = match;
+        let hrs = parseInt(hours, 10);
+        if (modifier.toUpperCase() === "PM" && hrs < 12) hrs += 12;
+        if (modifier.toUpperCase() === "AM" && hrs === 12) hrs = 0;
+        return `${String(hrs).padStart(2, "0")}:${minutes}`;
+    };
+
+    // Helper to convert 24-hour (e.g. "06:00") to 12-hour (e.g. "06:00 AM")
+    const convertTo12Hour = (timeStr) => {
+        if (!timeStr) return "";
+        const [hours, minutes] = timeStr.split(":");
+        let hrs = parseInt(hours, 10);
+        const modifier = hrs >= 12 ? "PM" : "AM";
+        hrs = hrs % 12;
+        hrs = hrs ? hrs : 12; // the hour '0' should be '12'
+        return `${String(hrs).padStart(2, "0")}:${minutes} ${modifier}`;
+    };
+
+    useEffect(() => {
+        fetchSlots();
+    }, []);
+
+    const fetchSlots = async () => {
+        try {
+            setSlotsLoading(true);
+            const res = await fetch("http://localhost:5000/api/menu/slots/all");
+            const data = await res.json();
+            const slots = {};
+            data.forEach(s => {
+                slots[s.category.toLowerCase()] = { 
+                    start_time: convertTo24Hour(s.start_time), 
+                    end_time: convertTo24Hour(s.end_time) 
+                };
+            });
+            setTempSlots(prev => ({ ...prev, ...slots }));
+        } catch (err) {
+            console.error("Error fetching slots:", err);
+        } finally {
+            setSlotsLoading(false);
+        }
+    };
+
+    const handleUpdateSlots = async (e) => {
+        e.preventDefault();
+        try {
+            const payload = Object.keys(tempSlots).map(cat => ({
+                category: cat.charAt(0).toUpperCase() + cat.slice(1),
+                start_time: convertTo12Hour(tempSlots[cat].start_time),
+                end_time: convertTo12Hour(tempSlots[cat].end_time)
+            }));
+
+            const res = await fetch("http://localhost:5000/api/menu/slots/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slots: payload })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("Meal time slots updated successfully!");
+                fetchSlots();
+            } else {
+                alert("Failed to update slots: " + (data.message || "Unknown error"));
+            }
+        } catch (err) {
+            console.error("Error updating slots:", err);
+            alert("Error updating slots: " + err.message);
+        }
+    };
+
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState(null);
     const [selectedImage, setSelectedImage] =
@@ -127,19 +209,13 @@ function MenuManagement({ searchQuery = "" }) {
                     body: JSON.stringify(payload)
                 });
 
-            const data =
-                await response.json();
+            const data = await response.json();
 
             if (data.success) {
-
                 fetchItems();
-
                 setShowModal(false);
-
                 setIsEditing(false);
-
                 setEditId(null);
-
                 setFormData({
                     image_url: "",
                     category: "Breakfast",
@@ -148,12 +224,14 @@ function MenuManagement({ searchQuery = "" }) {
                     available_qty: "",
                     is_active: "ACTIVE"
                 });
+                alert(isEditing ? "Menu item updated successfully!" : "Menu item added successfully!");
+            } else {
+                alert("Failed to save menu item: " + (data.message || "Unknown error"));
             }
 
         } catch (error) {
-
             console.error(error);
-
+            alert("Error saving menu item: " + error.message);
         }
     };
 
@@ -259,6 +337,52 @@ function MenuManagement({ searchQuery = "" }) {
                     Add New Item
                 </button>
 
+            </div>
+
+            {/* TIME SLOTS CONFIGURATION PANEL */}
+            <div className="time-slots-config-card" style={{ background: "#ffffff", padding: "20px", borderRadius: "12px", border: "1px solid #e2e8f0", marginBottom: "25px" }}>
+                <h3 style={{ margin: "0 0 15px 0", fontSize: "16px", color: "#1e293b", fontWeight: "700" }}>Meal Time Slots Configuration</h3>
+                {slotsLoading ? (
+                    <div style={{ fontSize: "14px", color: "#64748b" }}>Loading time slots...</div>
+                ) : (
+                    <form onSubmit={handleUpdateSlots} style={{ display: "flex", gap: "20px", alignItems: "flex-end", flexWrap: "wrap" }}>
+                        {Object.keys(tempSlots).map((cat) => (
+                            <div key={cat} style={{ display: "flex", gap: "10px", alignItems: "center", background: "#f8fafc", padding: "10px 15px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                                <span style={{ fontWeight: "600", minWidth: "80px", textTransform: "capitalize", fontSize: "14px", color: "#475569" }}>{cat}:</span>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                    <label style={{ fontSize: "10px", color: "#64748b" }}>Start Time</label>
+                                    <input 
+                                        type="time" 
+                                        value={tempSlots[cat].start_time}
+                                        onChange={(e) => setTempSlots({
+                                            ...tempSlots,
+                                            [cat]: { ...tempSlots[cat], start_time: e.target.value }
+                                        })}
+                                        style={{ width: "120px", padding: "4px 8px", fontSize: "13px", border: "1px solid #cbd5e1", borderRadius: "4px" }}
+                                    />
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                    <label style={{ fontSize: "10px", color: "#64748b" }}>End Time</label>
+                                    <input 
+                                        type="time" 
+                                        value={tempSlots[cat].end_time}
+                                        onChange={(e) => setTempSlots({
+                                            ...tempSlots,
+                                            [cat]: { ...tempSlots[cat], end_time: e.target.value }
+                                        })}
+                                        style={{ width: "120px", padding: "4px 8px", fontSize: "13px", border: "1px solid #cbd5e1", borderRadius: "4px" }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                        <button 
+                            type="submit" 
+                            style={{ background: "#7c3aed", color: "#ffffff", border: "none", padding: "10px 20px", borderRadius: "8px", fontWeight: "600", cursor: "pointer", fontSize: "14px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        >
+                            Update Slots
+                        </button>
+                    </form>
+                )}
             </div>
 
             <div className="meal-cards">

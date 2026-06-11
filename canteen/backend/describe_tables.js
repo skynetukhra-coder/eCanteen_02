@@ -8,19 +8,15 @@ async function main() {
         database: "canteen"
     });
     
-    const [paymentsCols] = await connection.query("DESCRIBE payments");
-    console.log("payments cols:", paymentsCols.map(c => `${c.Field} (${c.Type})`));
-
-    const [ordersCols] = await connection.query("DESCRIBE orders");
-    console.log("orders cols:", ordersCols.map(c => `${c.Field} (${c.Type})`));
-
-    const [wtCols] = await connection.query("DESCRIBE wallet_transactions");
-    console.log("wallet_transactions cols:", wtCols.map(c => `${c.Field} (${c.Type})`));
-
-    const [cbCols] = await connection.query("DESCRIBE cashbook");
-    console.log("cashbook cols:", cbCols.map(c => `${c.Field} (${c.Type})`));
+    try {
+        const [rows] = await connection.query("DESCRIBE menu_items");
+        console.log("menu_items schema:", rows);
+    } catch (e) {
+        console.log("Error:", e.message);
+    }
 
     await connection.end();
 }
 
 main().catch(console.error);
+

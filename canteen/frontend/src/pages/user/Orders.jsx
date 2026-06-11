@@ -242,23 +242,7 @@ function Orders() {
                             </div>
                         </div>
 
-                        <div
-                            className={`status-card ${activeTab === "cancelled"
-                                ? "active-card"
-                                : ""
-                                }`}
-                            onClick={() =>
-                                setActiveTab("cancelled")
-                            }
-                            style={{
-                                backgroundImage: `url(${cancelledImg})`,
-                            }}
-                        >
-                            <div className="overlay">
-                                <h2>{cancelledOrders.length}</h2>
-                                <span>Cancelled</span>
-                            </div>
-                        </div>
+
 
                     </div>
 
@@ -470,107 +454,7 @@ function Orders() {
 
                         </div>
 
-                    )}
-
-                    {/* CANCELLED */}
-
-                    {activeTab === "cancelled" && (
-
-                        <div className="order-list">
-
-                            {cancelledOrders.map(
-                                (order) => (
-                                    <div
-                                        className="order-card"
-                                        key={order.order_id}
-                                    >
-
-                                        <div className="order-top">
-
-                                            <div className="order-icon cancelled-icon">
-                                                <FaTimesCircle />
-                                            </div>
-
-                                            <div>
-                                                <h3>
-                                                    {
-                                                        order.items
-                                                    }
-                                                </h3>
-
-                                                <span>
-                                                    ORD{
-                                                        order.order_id
-                                                    }
-                                                </span>
-                                            </div>
-
-                                        </div>
-
-                                        <div className="order-info">
-
-                                            <p>
-                                                <strong>
-                                                    Amount:
-                                                </strong>{" "}
-                                                ₹{order.total_amount}
-                                            </p>
-
-                                            <p>
-                                                <strong>
-                                                    Pickup:
-                                                </strong>{" "}
-                                                {
-                                                    order.pickup_time
-                                                        ? new Date(
-                                                            order.pickup_time
-                                                        ).toLocaleTimeString()
-                                                        : "-"
-                                                }
-                                            </p>
-
-                                        </div>
-
-                                        <span className="status cancelled">
-                                            Cancelled
-                                        </span>
-
-                                        {/* DETAILS PANEL */}
-                                        {expandedOrders[order.order_id] && (
-                                            <div className="order-items-detail" style={{ margin: "15px 0", padding: "12px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                                                <h4 style={{ margin: "0 0 8px 0", color: "#475569", fontSize: "14px" }}>Item Details:</h4>
-                                                {orderItemsDetails[order.order_id] ? (
-                                                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                                        {orderItemsDetails[order.order_id].map(item => (
-                                                            <div key={item.order_item_id} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#334155" }}>
-                                                                <span>{item.item_name} <strong>x {item.quantity}</strong></span>
-                                                                <strong>₹{(item.unit_price * item.quantity).toFixed(2)}</strong>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <span style={{ fontSize: "12px", color: "#64748b" }}>Loading items...</span>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        <div className="order-actions">
-                                            <button 
-                                                className="secondary-btn"
-                                                onClick={() => toggleOrderDetails(order.order_id)}
-                                            >
-                                                <FaEye />
-                                                {expandedOrders[order.order_id] ? "Hide Details" : "Details"}
-                                            </button>
-                                        </div>
-
-                                    </div>
-                                )
                             )}
-
-                        </div>
-
-                    )}
 
                 </div>
 

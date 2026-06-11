@@ -37,9 +37,11 @@ router.post("/login", (req, res) => {
             return res.status(200).json({
                 success: true,
                 user: {
-                    id: user.id,
+                    employee_id: user.employee_id,
                     username: user.username,
                     role: user.role,
+                    full_name: user.full_name,
+                    profile_image: user.profile_image
                 },
             });
         } catch (error) {

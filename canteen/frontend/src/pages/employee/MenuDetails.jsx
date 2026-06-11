@@ -54,12 +54,80 @@ function MenuDetails() {
         },
     };
 
-    const selectedMenu =
+    const [timeSlots, setTimeSlots] = useState({
+        breakfast: "06:00 AM - 10:00 AM",
+        lunch: "11:30 AM - 02:30 PM",
+        snacks: "04:00 PM - 06:00 PM"
+    });
+    const [slotsLoaded, setSlotsLoaded] = useState(false);
+
+    const selectedMenuRaw =
         menuData[mealType?.toLowerCase()];
+
+    const selectedMenu = selectedMenuRaw ? {
+        ...selectedMenuRaw,
+        time: timeSlots[mealType?.toLowerCase()] || selectedMenuRaw.time
+    } : null;
+
+    const isTimeInSlot = (slotStr) => {
+        if (!slotStr) return false;
+        const parts = slotStr.split("-");
+        if (parts.length !== 2) return false;
+        
+        const parseTimeString = (tStr) => {
+            const match = tStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (!match) return null;
+            let [_, hours, minutes, modifier] = match;
+            let hrs = parseInt(hours, 10);
+            if (modifier.toUpperCase() === "PM" && hrs < 12) hrs += 12;
+            if (modifier.toUpperCase() === "AM" && hrs === 12) hrs = 0;
+            const d = new Date();
+            d.setHours(hrs, parseInt(minutes, 10), 0, 0);
+            return d;
+        };
+
+        const startTime = parseTimeString(parts[0]);
+        const endTime = parseTimeString(parts[1]);
+        if (!startTime || !endTime) return false;
+
+        const now = new Date();
+        if (endTime < startTime) {
+            endTime.setDate(endTime.getDate() + 1);
+        }
+        return now >= startTime && now <= endTime;
+    };
 
     useEffect(() => {
         fetchMenuItems();
     }, [mealType]);
+
+    useEffect(() => {
+        axios.get("http://localhost:5000/api/menu/slots/all")
+            .then(res => {
+                const slots = {};
+                res.data.forEach(s => {
+                    slots[s.category.toLowerCase()] = `${s.start_time} - ${s.end_time}`;
+                });
+                setTimeSlots(prev => ({ ...prev, ...slots }));
+                setSlotsLoaded(true);
+            })
+            .catch(err => {
+                console.error("Error loading time slots:", err);
+                setSlotsLoaded(true);
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!slotsLoaded) return;
+        const isAdmin = user?.role === "ADMIN" || user?.username === "admin";
+        if (isAdmin) return;
+
+        const slotStr = timeSlots[mealType?.toLowerCase()];
+        if (slotStr && !isTimeInSlot(slotStr)) {
+            alert(`The ${mealType} menu is only accessible between ${slotStr}. Current time is outside this slot.`);
+            navigate("/home");
+        }
+    }, [slotsLoaded, mealType, timeSlots, user, navigate]);
 
     const fetchMenuItems = async () => {
         try {
@@ -78,6 +146,11 @@ function MenuDetails() {
 
     const increaseQty = (id, availableQty) => {
         const isAdmin = user?.role === "ADMIN" || user?.username === "admin";
+        const currentQty = quantities[id] || 0;
+        if (!isAdmin && currentQty >= Number(availableQty || 0)) {
+            alert(`Cannot add more than available stock quantity (${availableQty}).`);
+            return;
+        }
         if (isAdmin && Number(availableQty || 0) <= 0) {
             alert(`Warning: This item is out of stock (Available quantity: ${availableQty}). Proceeding will drive inventory negative.`);
         }
@@ -119,6 +192,14 @@ function MenuDetails() {
         localStorage.clear();
         navigate("/login");
     };
+
+    if (!slotsLoaded) {
+        return (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", fontSize: "18px", fontWeight: "600", color: "#475569" }}>
+                Checking time slot restrictions...
+            </div>
+        );
+    }
 
     if (!selectedMenu) {
         return (
@@ -212,8 +293,12 @@ function MenuDetails() {
 
                                         <span>₹{item.price}</span>
 
+                                        <div style={{ color: isOutOfStock ? "#ef4444" : "#10b981", fontSize: "12px", fontWeight: "600", marginTop: "4px" }}>
+                                            Available Stock: {item.available_qty || 0}
+                                        </div>
+
                                         {isAdmin && isOutOfStock && (
-                                            <div style={{ color: "#d97706", fontSize: "11px", fontWeight: "600", marginTop: "4px" }}>
+                                            <div style={{ color: "#d97706", fontSize: "11px", fontWeight: "600", marginTop: "2px" }}>
                                                 ⚠️ Warning: Stock is {item.available_qty || 0}
                                             </div>
                                         )}

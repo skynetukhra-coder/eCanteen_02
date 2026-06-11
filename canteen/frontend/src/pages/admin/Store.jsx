@@ -19,11 +19,15 @@ const API_BASE = "http://localhost:5000/api/inventory";
 function Store() {
     const [inventoryList, setInventoryList] = useState([]);
     const [purchasesList, setPurchasesList] = useState([]);
+    const [issuesList, setIssuesList] = useState([]);
 
     // Modal Visibility States
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
+    const [isStoreLogsOpen, setIsStoreLogsOpen] = useState(false);
+    const [isIssuesLogOpen, setIsIssuesLogOpen] = useState(false);
+    const [logsTab, setLogsTab] = useState("inventory");
 
     // Form States - Add Item
     const [addItemForm, setAddItemForm] = useState({
@@ -60,12 +64,14 @@ function Store() {
 
     const fetchData = async () => {
         try {
-            const [invRes, purRes] = await Promise.all([
+            const [invRes, purRes, issRes] = await Promise.all([
                 axios.get(API_BASE),
-                axios.get(`${API_BASE}/purchases`)
+                axios.get(`${API_BASE}/purchases`),
+                axios.get(`${API_BASE}/issues`)
             ]);
             setInventoryList(invRes.data);
             setPurchasesList(purRes.data);
+            setIssuesList(issRes.data);
         } catch (err) {
             console.error("Error fetching store data:", err);
         }
@@ -151,7 +157,7 @@ function Store() {
 
     // Calculate metrics
     const totalStockValue = inventoryList.reduce((sum, item) => {
-        return sum + (Number(item.current_stock) * Number(item.unit_cost));
+        return sum + (Number(item.current_stock) * Number(item.last_purchased_price || item.unit_cost || 0));
     }, 0);
 
     const lowStockCount = inventoryList.filter(item => {
@@ -216,7 +222,7 @@ function Store() {
                                 <th>Current Stock</th>
                                 <th>Min Stock</th>
                                 <th>Status</th>
-                                <th>Unit Cost (₹)</th>
+                                <th>Last Purchased Price (₹)</th>
                             </tr>
                         </thead>
 
@@ -243,7 +249,7 @@ function Store() {
                                                     {isLow ? "Low Stock" : "In Stock"}
                                                 </span>
                                             </td>
-                                            <td>₹{Number(item.unit_cost).toFixed(2)}</td>
+                                            <td>₹{Number(item.last_purchased_price || item.unit_cost || 0).toFixed(2)}</td>
                                         </tr>
                                     );
                                 })
@@ -257,7 +263,7 @@ function Store() {
             <div className="card">
                 <h3 className="section-title">Store Quick Actions</h3>
 
-                <div className="action-grid">
+                <div className="action-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
                     <div className="action-card" onClick={() => setIsAddModalOpen(true)}>
                         <div className="action-icon green-bg">
                             <FaPlus />
@@ -277,6 +283,20 @@ function Store() {
                             <FaUpload />
                         </div>
                         <span>Stock Issue</span>
+                    </div>
+
+                    <div className="action-card" onClick={() => setIsIssuesLogOpen(true)}>
+                        <div className="action-icon red-bg" style={{ background: "#ef4444" }}>
+                            <FaFileAlt />
+                        </div>
+                        <span>Stocks Issued</span>
+                    </div>
+
+                    <div className="action-card" onClick={() => setIsStoreLogsOpen(true)}>
+                        <div className="action-icon blue-bg" style={{ background: "#3b82f6" }}>
+                            <FaCog />
+                        </div>
+                        <span>Store Logs</span>
                     </div>
                 </div>
             </div>
@@ -566,6 +586,186 @@ function Store() {
                                 <button type="submit" className="submit-btn">Issue Stock</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: STOCKS ISSUED LOGS */}
+            {isIssuesLogOpen && (
+                <div className="modal-overlay" style={{ zIndex: 1050 }}>
+                    <div className="modal-content" style={{ maxWidth: "800px", width: "90%" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                            <h2>Stocks Issued History</h2>
+                            <button className="cancel-btn" onClick={() => setIsIssuesLogOpen(false)} style={{ padding: "4px 8px" }}>×</button>
+                        </div>
+                        <div className="table-wrapper" style={{ maxHeight: "400px", overflowY: "auto" }}>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Issue ID</th>
+                                        <th>Item Code</th>
+                                        <th>Item Name</th>
+                                        <th>Qty Issued</th>
+                                        <th>Remarks</th>
+                                        <th>Issued Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {issuesList.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" style={{ textAlign: "center", color: "#666" }}>
+                                                No stock issues logged yet.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        issuesList.map((iss) => (
+                                            <tr key={iss.issue_id}>
+                                                <td>{iss.issue_id}</td>
+                                                <td>{iss.item_code}</td>
+                                                <td>{iss.item_name}</td>
+                                                <td><strong>{Number(iss.quantity).toFixed(2)}</strong></td>
+                                                <td>{iss.remarks || "Stock Issue"}</td>
+                                                <td>{new Date(iss.issued_date).toLocaleString("en-IN")}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: STORE LOGS (TABBED SYSTEM LOGS) */}
+            {isStoreLogsOpen && (
+                <div className="modal-overlay" style={{ zIndex: 1050 }}>
+                    <div className="modal-content" style={{ maxWidth: "1000px", width: "95%" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                            <h2>Store Inventory Logs Console</h2>
+                            <button className="cancel-btn" onClick={() => setIsStoreLogsOpen(false)} style={{ padding: "4px 8px" }}>×</button>
+                        </div>
+
+                        {/* TABS */}
+                        <div style={{ display: "flex", gap: "10px", marginBottom: "20px", borderBottom: "1px solid #e2e8f0", paddingBottom: "10px" }}>
+                            <button 
+                                className={`tab-btn ${logsTab === "inventory" ? "active" : ""}`}
+                                onClick={() => setLogsTab("inventory")}
+                                style={{ padding: "8px 16px", border: "none", background: logsTab === "inventory" ? "#3b82f6" : "transparent", color: logsTab === "inventory" ? "white" : "#475569", borderRadius: "6px", cursor: "pointer", fontWeight: 600 }}
+                            >
+                                Current Stock / Manual Adds
+                            </button>
+                            <button 
+                                className={`tab-btn ${logsTab === "purchases" ? "active" : ""}`}
+                                onClick={() => setLogsTab("purchases")}
+                                style={{ padding: "8px 16px", border: "none", background: logsTab === "purchases" ? "#3b82f6" : "transparent", color: logsTab === "purchases" ? "white" : "#475569", borderRadius: "6px", cursor: "pointer", fontWeight: 600 }}
+                            >
+                                Purchase Logs (GRN Ledger)
+                            </button>
+                            <button 
+                                className={`tab-btn ${logsTab === "issues" ? "active" : ""}`}
+                                onClick={() => setLogsTab("issues")}
+                                style={{ padding: "8px 16px", border: "none", background: logsTab === "issues" ? "#3b82f6" : "transparent", color: logsTab === "issues" ? "white" : "#475569", borderRadius: "6px", cursor: "pointer", fontWeight: 600 }}
+                            >
+                                Stock Drawdown Logs (Issues)
+                            </button>
+                        </div>
+
+                        <div className="table-wrapper" style={{ maxHeight: "450px", overflowY: "auto" }}>
+                            {logsTab === "inventory" && (
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Item Code</th>
+                                            <th>Item Name</th>
+                                            <th>Category</th>
+                                            <th>Unit</th>
+                                            <th>Current Stock</th>
+                                            <th>Min Stock</th>
+                                            <th>Base Unit Price</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {inventoryList.map((item) => (
+                                            <tr key={item.item_id}>
+                                                <td>{item.item_code}</td>
+                                                <td>{item.item_name}</td>
+                                                <td>{item.category}</td>
+                                                <td>{item.unit}</td>
+                                                <td>{Number(item.current_stock).toFixed(2)}</td>
+                                                <td>{Number(item.minimum_stock).toFixed(2)}</td>
+                                                <td>₹{Number(item.unit_cost).toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+
+                            {logsTab === "purchases" && (
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice No.</th>
+                                            <th>Item Code</th>
+                                            <th>Item Name</th>
+                                            <th>Supplier</th>
+                                            <th>Qty Purchased</th>
+                                            <th>Unit Cost</th>
+                                            <th>Total Cost</th>
+                                            <th>Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {purchasesList.map((pur) => (
+                                            <tr key={pur.purchase_id}>
+                                                <td>{pur.invoice_number || "N/A"}</td>
+                                                <td>{pur.item_code}</td>
+                                                <td>{pur.item_name}</td>
+                                                <td>{pur.supplier_name}</td>
+                                                <td>{Number(pur.quantity).toFixed(2)} ({pur.unit})</td>
+                                                <td>₹{Number(pur.unit_cost).toFixed(2)}</td>
+                                                <td>₹{Number(pur.total_amount).toFixed(2)}</td>
+                                                <td>{new Date(pur.purchase_date).toLocaleDateString("en-IN")}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+
+                            {logsTab === "issues" && (
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Issue ID</th>
+                                            <th>Item Code</th>
+                                            <th>Item Name</th>
+                                            <th>Qty Issued</th>
+                                            <th>Remarks</th>
+                                            <th>Issued Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {issuesList.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="6" style={{ textAlign: "center", color: "#666" }}>
+                                                    No stock issues logged yet.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            issuesList.map((iss) => (
+                                                <tr key={iss.issue_id}>
+                                                    <td>{iss.issue_id}</td>
+                                                    <td>{iss.item_code}</td>
+                                                    <td>{iss.item_name}</td>
+                                                    <td><strong>{Number(iss.quantity).toFixed(2)}</strong></td>
+                                                    <td>{iss.remarks || "Stock Issue"}</td>
+                                                    <td>{new Date(iss.issued_date).toLocaleString("en-IN")}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

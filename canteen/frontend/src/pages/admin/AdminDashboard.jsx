@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -52,8 +52,8 @@ import Store from "../admin/Store";
 import Cashbook from "../admin/Cashbook";
 import OrdersManagement from "../admin/OrdersManagement";
 import WalletManagement from "./WalletManagement";
-import AdminPayments
-    from "./AdminPayments";
+import AdminPayments from "./AdminPayments";
+import AuditLogs from "./AuditLogs";
 
 const blue = "#0b63f6";
 const green = "#22b24c";
@@ -378,6 +378,38 @@ function AdminDashboard() {
     const isDashboard = sectionKey === "dashboard" || pathname === "/admin";
     const [searchQuery, setSearchQuery] = useState("");
 
+    // Dynamic notifications count logic
+    const [adminNotifications, setAdminNotifications] = useState([]);
+    const [lastViewedAdminNotifId, setLastViewedAdminNotifId] = useState(
+        parseInt(localStorage.getItem("lastViewedAdminNotifId") || "0")
+    );
+
+    useEffect(() => {
+        axios.get("http://localhost:5000/api/notifications/list")
+            .then(res => {
+                setAdminNotifications(res.data);
+            })
+            .catch(err => console.error("Error loading admin notifications:", err));
+    }, [pathname]);
+
+    const adminUnreadCount = useMemo(() => {
+        return adminNotifications.filter(n => n.id > lastViewedAdminNotifId).length;
+    }, [adminNotifications, lastViewedAdminNotifId]);
+
+    const clearAdminUnread = () => {
+        if (adminNotifications.length > 0) {
+            const maxId = Math.max(...adminNotifications.map(n => n.id));
+            localStorage.setItem("lastViewedAdminNotifId", String(maxId));
+            setLastViewedAdminNotifId(maxId);
+        }
+    };
+
+    useEffect(() => {
+        if (pathname === "/admin/notifications") {
+            clearAdminUnread();
+        }
+    }, [pathname, adminNotifications]);
+
     const goTo = (path) => navigate(path);
 
     return (
@@ -398,11 +430,15 @@ function AdminDashboard() {
                     {sidebarItems.map((item) => {
                         const Icon = item.icon;
                         const active = item.path === "/admin" ? isDashboard : pathname.startsWith(item.path);
+                        let badgeValue = item.badge;
+                        if (item.label === "Notifications") {
+                            badgeValue = adminUnreadCount > 0 ? String(adminUnreadCount) : null;
+                        }
                         return (
                             <button className={active ? "active" : ""} key={item.path} onClick={() => goTo(item.path)}>
                                 <Icon />
                                 <span>{item.label}</span>
-                                {item.badge && <b>{item.badge}</b>}
+                                {badgeValue && <b>{badgeValue}</b>}
                             </button>
                         );
                     })}
@@ -413,7 +449,12 @@ function AdminDashboard() {
                 </button>
             </aside>
             <div className="ec-workspace">
-                <TopBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+                <TopBar 
+                    searchQuery={searchQuery} 
+                    setSearchQuery={setSearchQuery} 
+                    adminUnreadCount={adminUnreadCount}
+                    clearAdminUnread={clearAdminUnread}
+                />
 
                 {isDashboard ? (
                     <DashboardHome navigate={goTo} searchQuery={searchQuery} />
@@ -429,6 +470,8 @@ function AdminDashboard() {
                     <Cashbook />
                 ) : sectionKey === "payments" ? (
                     <AdminPayments />
+                ) : sectionKey === "audit-logs" ? (
+                    <AuditLogs />
                 ) : sectionKey === "change-password" ? (
                     <ChangePassword />
                 ) : (
@@ -442,7 +485,7 @@ function AdminDashboard() {
     );
 }
 
-function TopBar({ searchQuery, setSearchQuery }) {
+function TopBar({ searchQuery, setSearchQuery, adminUnreadCount, clearAdminUnread }) {
     const navigate = useNavigate();
     const [time, setTime] = useState(new Date());
 
@@ -474,13 +517,15 @@ function TopBar({ searchQuery, setSearchQuery }) {
                 <FaSearch />
             </label>
             <div className="ec-actions">
-                <button className="ec-icon-button" onClick={() => navigate("/admin/notifications")}>
+                <button className="ec-icon-button" onClick={() => {
+                    navigate("/admin/notifications");
+                    clearAdminUnread();
+                }}>
                     <FaBell />
-                    <span>12</span>
+                    {adminUnreadCount > 0 && <span>{adminUnreadCount}</span>}
                 </button>
                 <button className="ec-icon-button" onClick={() => navigate("/admin/audit-logs")}>
                     <FaReceipt />
-                    <span>5</span>
                 </button>
                 <div className="ec-user" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/settings")}>
                     <div className="ec-mini-avatar">A</div>

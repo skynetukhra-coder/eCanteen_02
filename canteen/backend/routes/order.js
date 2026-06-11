@@ -27,6 +27,27 @@ router.post("/create", async (req, res) => {
             if (adminGuestRows.length > 0) {
                 empId = adminGuestRows[0].employee_id;
             }
+        } else {
+            // Check stock availability for non-admin employee orders
+            for (const item of items) {
+                const [menuItemRows] = await db.query(
+                    "SELECT item_name, available_qty FROM menu_items WHERE item_id = ?",
+                    [item.item_id]
+                );
+                if (menuItemRows.length === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: `Menu item not found: ${item.item_name}`
+                    });
+                }
+                const available = parseInt(menuItemRows[0].available_qty || 0);
+                if (available < item.quantity) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Insufficient stock for ${menuItemRows[0].item_name}. Available: ${available}, requested: ${item.quantity}`
+                    });
+                }
+            }
         }
 
         const couponCode =

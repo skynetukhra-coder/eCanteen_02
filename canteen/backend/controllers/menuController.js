@@ -11,7 +11,7 @@ exports.getAllItems = async (req, res) => {
         res.json(rows);
     } catch (err) {
         console.error(err);
-        res.status(500).json(err);
+        res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -56,7 +56,7 @@ exports.addItem = async (req, res) => {
 
     } catch (err) {
         console.error(err);
-        res.status(500).json(err);
+        res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -105,7 +105,7 @@ exports.updateItem = async (req, res) => {
 
     } catch (err) {
         console.error(err);
-        res.status(500).json(err);
+        res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -130,6 +130,6 @@ exports.deleteItem = async (req, res) => {
 
     } catch (err) {
         console.error(err);
-        res.status(500).json(err);
+        res.status(500).json({ success: false, message: err.message });
     }
 };
