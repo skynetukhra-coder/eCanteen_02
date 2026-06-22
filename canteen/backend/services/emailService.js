@@ -8,7 +8,13 @@ const transporter = nodemailer.createTransport({
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
-    }
+    },
+    tls: {
+        rejectUnauthorized: false // Prevents handshake issues on custom/shared hosts
+    },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000
 });
 
 /**
