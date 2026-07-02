@@ -26,9 +26,7 @@ exports.login = async (req, res) => {
         console.log("DB Password:", user.password);
         console.log("Entered Password:", password);
 
-        const bcrypt = require("bcrypt");
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
+        if (password !== user.password) {
             return res.json({
                 success: false,
                 message: "Invalid Password"
@@ -85,19 +83,16 @@ exports.changePassword = async (req, res) => {
 
         const user = rows[0];
 
-        const bcrypt = require("bcrypt");
-        const isMatch = await bcrypt.compare(current_password, user.password);
-        if (!isMatch) {
+        if (current_password !== user.password) {
             return res.status(400).json({
                 success: false,
                 message: "Incorrect current password."
             });
         }
 
-        const hashedNewPassword = await bcrypt.hash(new_password, 10);
         await db.query(
             "UPDATE employee SET password = ? WHERE employee_id = ?",
-            [hashedNewPassword, employee_id]
+            [new_password, employee_id]
         );
 
         // Insert log in audit_logs
@@ -366,14 +361,10 @@ exports.resetPassword = async (req, res) => {
             });
         }
 
-        // Hash new password
-        const bcrypt = require("bcrypt");
-        const hashedPassword = await bcrypt.hash(new_password, 10);
-
         // Update password and clear OTP columns
         await db.query(
             "UPDATE employee SET password = ?, otp_code = NULL, otp_expiry = NULL WHERE employee_id = ?",
-            [hashedPassword, user.employee_id]
+            [new_password, user.employee_id]
         );
 
         // Insert log in audit_logs
