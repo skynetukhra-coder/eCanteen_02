@@ -377,6 +377,15 @@ function AdminDashboard() {
     const isDashboard = sectionKey === "dashboard" || pathname === "/admin";
     const [searchQuery, setSearchQuery] = useState("");
 
+    const getTodayStr = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    const [selectedDate, setSelectedDate] = useState(getTodayStr);
+
     // Dynamic notifications count logic
     const [adminNotifications, setAdminNotifications] = useState([]);
     const [lastViewedAdminNotifId, setLastViewedAdminNotifId] = useState(
@@ -453,10 +462,12 @@ function AdminDashboard() {
                     setSearchQuery={setSearchQuery} 
                     adminUnreadCount={adminUnreadCount}
                     clearAdminUnread={clearAdminUnread}
+                    selectedDate={selectedDate}
+                    setSelectedDate={setSelectedDate}
                 />
 
                 {isDashboard ? (
-                    <DashboardHome navigate={goTo} searchQuery={searchQuery} />
+                    <DashboardHome navigate={goTo} searchQuery={searchQuery} selectedDate={selectedDate} />
                 ) : sectionKey === "menu" ? (
                     <MenuManagement searchQuery={searchQuery} />
                 ) : sectionKey === "orders" ? (
@@ -473,6 +484,8 @@ function AdminDashboard() {
                     <AuditLogs />
                 ) : sectionKey === "change-password" ? (
                     <ChangePassword />
+                ) : sectionKey === "settings" ? (
+                    <SettingsManagement />
                 ) : (
                     <AdminSection
                         sectionKey={sectionKey}
@@ -484,7 +497,7 @@ function AdminDashboard() {
     );
 }
 
-function TopBar({ searchQuery, setSearchQuery, adminUnreadCount, clearAdminUnread }) {
+function TopBar({ searchQuery, setSearchQuery, adminUnreadCount, clearAdminUnread, selectedDate, setSelectedDate }) {
     const navigate = useNavigate();
     const [time, setTime] = useState(new Date());
 
@@ -493,13 +506,16 @@ function TopBar({ searchQuery, setSearchQuery, adminUnreadCount, clearAdminUnrea
         return () => clearInterval(timer);
     }, []);
 
-    const dateStr = time.toLocaleDateString("en-GB", {
+    const activeDate = selectedDate ? new Date(selectedDate) : time;
+    const dateStr = activeDate.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric"
     });
 
-    const dayTimeStr = `${time.toLocaleDateString("en-GB", { weekday: "long" })}, ${time.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+    const dayTimeStr = selectedDate 
+        ? `${activeDate.toLocaleDateString("en-GB", { weekday: "long" })} (Historical View)`
+        : `${time.toLocaleDateString("en-GB", { weekday: "long" })}, ${time.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 
     return (
         <header className="ec-topbar">
@@ -534,19 +550,36 @@ function TopBar({ searchQuery, setSearchQuery, adminUnreadCount, clearAdminUnrea
                     <strong>{dateStr}</strong>
                     <small>{dayTimeStr}</small>
                 </div>
-                <FaCalendarAlt className="calendar-icon" style={{ cursor: "pointer" }} onClick={() => navigate("/admin")} />
+                <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                    <FaCalendarAlt className="calendar-icon" style={{ cursor: "pointer" }} />
+                    <input 
+                        type="date" 
+                        value={selectedDate} 
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            opacity: 0,
+                            width: "100%",
+                            height: "100%",
+                            cursor: "pointer"
+                        }}
+                    />
+                </div>
             </div>
         </header>
     );
 }
 
 
-function DashboardHome({ navigate, searchQuery = "" }) {
+function DashboardHome({ navigate, searchQuery = "", selectedDate }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        axios.get((window.API_BASE_URL || "http://localhost:5000") + "/api/admin-stats/dashboard")
+        setLoading(true);
+        axios.get((window.API_BASE_URL || "http://localhost:5000") + `/api/admin-stats/dashboard?date=${selectedDate}`)
             .then(res => {
                 if (res.data.success) {
                     setData(res.data);
@@ -557,19 +590,33 @@ function DashboardHome({ navigate, searchQuery = "" }) {
                 console.error("Error loading dashboard data:", err);
                 setLoading(false);
             });
-    }, []);
+    }, [selectedDate]);
 
     if (loading) {
         return <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Loading dashboard stats...</div>;
     }
 
+    const dailyLimit = Number(localStorage.getItem("setting_daily_limit") || 1000);
+    const totalUsersLimit = Number(localStorage.getItem("setting_total_users_limit") || 1000);
+
     const currentKPIs = kpis.map((kpi, index) => {
         if (!data?.kpis || !data.kpis[index]) return kpi;
+        const backendKpi = data.kpis[index];
+        if (index === 0) {
+            const val = Number(backendKpi.value) || 0;
+            return {
+                ...kpi,
+                value: backendKpi.value,
+                sub: `/ ${totalUsersLimit}`,
+                note: backendKpi.note,
+                progress: Math.min((val / totalUsersLimit) * 100, 100)
+            };
+        }
         return {
             ...kpi,
-            value: data.kpis[index].value,
-            note: data.kpis[index].note,
-            progress: data.kpis[index].progress
+            value: backendKpi.value,
+            note: backendKpi.note,
+            progress: backendKpi.progress
         };
     });
 
@@ -652,28 +699,6 @@ function DashboardHome({ navigate, searchQuery = "" }) {
                         <ResponsiveContainer width="100%" height={350}>
                             <LineChart data={currentOrderTrend}>
 
-                                <defs>
-                                    <linearGradient
-                                        id="ordersGradient"
-                                        x1="0"
-                                        y1="0"
-                                        x2="0"
-                                        y2="1"
-                                    >
-                                        <stop
-                                            offset="0%"
-                                            stopColor="#0b63f6"
-                                            stopOpacity={0.35}
-                                        />
-
-                                        <stop
-                                            offset="100%"
-                                            stopColor="#0b63f6"
-                                            stopOpacity={0}
-                                        />
-                                    </linearGradient>
-                                </defs>
-
                                 <CartesianGrid
                                     stroke="#e8edf7"
                                     vertical={false}
@@ -685,22 +710,46 @@ function DashboardHome({ navigate, searchQuery = "" }) {
 
                                 <Tooltip />
 
-                                <Area
+                                <Line
                                     type="monotone"
-                                    dataKey="orders"
-                                    fill="url(#ordersGradient)"
-                                    stroke="none"
+                                    dataKey="Breakfast"
+                                    stroke={orange}
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: orange }}
+                                />
+
+                                <Line
+                                    type="monotone"
+                                    dataKey="Lunch"
+                                    stroke={blue}
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: blue }}
+                                />
+
+                                <Line
+                                    type="monotone"
+                                    dataKey="Tiffin"
+                                    stroke={green}
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: green }}
+                                />
+
+                                <Line
+                                    type="monotone"
+                                    dataKey="Dinner"
+                                    stroke={purple}
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: purple }}
                                 />
 
                                 <Line
                                     type="monotone"
                                     dataKey="orders"
-                                    stroke="#0b63f6"
-                                    strokeWidth={4}
-                                    dot={{
-                                        r: 5,
-                                        fill: "#0b63f6"
-                                    }}
+                                    name="Total Orders"
+                                    stroke="#94a3b8"
+                                    strokeWidth={2}
+                                    strokeDasharray="5 5"
+                                    dot={{ r: 3, fill: "#94a3b8" }}
                                 />
 
                             </LineChart>
@@ -746,13 +795,13 @@ function DashboardHome({ navigate, searchQuery = "" }) {
 
                 <div className="dashboard-row row-2">
 
-                    <Panel title="Daily Coupon Limit (Max 1000)"
+                    <Panel title={`Daily Coupon Limit (Max ${dailyLimit})`}
                         className="coupon-panel">
                         <div className="coupon-limit">
-                            <div className="gauge"><span>{totalOrdersToday}<strong>Issued</strong><small>1000 Max</small></span></div>
+                            <div className="gauge"><span>{totalOrdersToday}<strong>Issued</strong><small>{dailyLimit} Max</small></span></div>
                             <div className="limit-stats">
-                                <span>Remaining<b>{Math.max(0, 1000 - Number(totalOrdersToday))}</b></span>
-                                <span>Utilization<b>{((Math.min(1000, Number(totalOrdersToday)) / 1000) * 100).toFixed(1)}%</b></span>
+                                <span>Remaining<b>{Math.max(0, dailyLimit - Number(totalOrdersToday))}</b></span>
+                                <span>Utilization<b>{((Math.min(dailyLimit, Number(totalOrdersToday)) / dailyLimit) * 100).toFixed(1)}%</b></span>
                                 <span>Closed<b>0</b></span>
                             </div>
                         </div>
@@ -1488,6 +1537,163 @@ function ChangePassword() {
                         onMouseOut={(e) => e.target.style.background = "#0b63f6"}
                     >
                         {submitting ? "Updating Password..." : "Update Password"}
+                    </button>
+                </form>
+            </div>
+        </main>
+    );
+}
+
+function SettingsManagement() {
+    const [couponLimit, setCouponLimit] = useState(() => localStorage.getItem("setting_daily_limit") || "1000");
+    const [totalUsersLimit, setTotalUsersLimit] = useState(() => localStorage.getItem("setting_total_users_limit") || "1000");
+    const [upiGateway, setUpiGateway] = useState(() => localStorage.getItem("setting_upi_gateway") || "Enabled");
+    const [message, setMessage] = useState({ text: "", isError: false });
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = (e) => {
+        e.preventDefault();
+        setMessage({ text: "", isError: false });
+        
+        if (!couponLimit || isNaN(couponLimit) || Number(couponLimit) <= 0) {
+            setMessage({ text: "Please enter a valid daily coupon limit.", isError: true });
+            return;
+        }
+
+        if (!totalUsersLimit || isNaN(totalUsersLimit) || Number(totalUsersLimit) <= 0) {
+            setMessage({ text: "Please enter a valid total users list limit.", isError: true });
+            return;
+        }
+
+        setSaving(true);
+        try {
+            localStorage.setItem("setting_daily_limit", couponLimit);
+            localStorage.setItem("setting_total_users_limit", totalUsersLimit);
+            localStorage.setItem("setting_upi_gateway", upiGateway);
+            
+            setMessage({ text: "Settings saved successfully!", isError: false });
+        } catch (err) {
+            console.error(err);
+            setMessage({ text: "Failed to save settings.", isError: true });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <main className="ec-settings-page" style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+            <div className="ec-panel" style={{ padding: "30px", borderRadius: "12px", background: "#fff", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "25px", borderBottom: "1px solid #f3f4f6", paddingBottom: "15px" }}>
+                    <div style={{ background: "#dbeafe", color: "#2563eb", padding: "12px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <FaCog size={24} />
+                    </div>
+                    <div>
+                        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#111827" }}>Canteen System Settings</h2>
+                        <p style={{ fontSize: "14px", color: "#6b7280", marginTop: "2px" }}>Configure coupon limits, total users list size, and payment gateway status</p>
+                    </div>
+                </div>
+
+                {message.text && (
+                    <div style={{
+                        padding: "12px 16px",
+                        borderRadius: "8px",
+                        marginBottom: "20px",
+                        fontSize: "14px",
+                        fontWeight: "500",
+                        background: message.isError ? "#fee2e2" : "#d1fae5",
+                        color: message.isError ? "#b91c1c" : "#065f46",
+                        border: `1px solid ${message.isError ? "#fca5a5" : "#6ee7b7"}`
+                    }}>
+                        {message.text}
+                    </div>
+                )}
+
+                <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <label style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>Daily Coupon Limit</label>
+                        <input
+                            type="number"
+                            required
+                            placeholder="e.g. 1000"
+                            value={couponLimit}
+                            onChange={(e) => setCouponLimit(e.target.value)}
+                            style={{
+                                padding: "10px 14px",
+                                borderRadius: "8px",
+                                border: "1px solid #d1d5db",
+                                fontSize: "14px",
+                                outline: "none",
+                                transition: "border-color 0.15s ease",
+                                color: "#111827",
+                                background: "#ffffff",
+                            }}
+                        />
+                        <small style={{ color: "#6b7280", fontSize: "12px" }}>The maximum number of food coupons that can be issued site-wide per day.</small>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <label style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>Total Users List Limit</label>
+                        <input
+                            type="number"
+                            required
+                            placeholder="e.g. 1000"
+                            value={totalUsersLimit}
+                            onChange={(e) => setTotalUsersLimit(e.target.value)}
+                            style={{
+                                padding: "10px 14px",
+                                borderRadius: "8px",
+                                border: "1px solid #d1d5db",
+                                fontSize: "14px",
+                                outline: "none",
+                                color: "#111827",
+                                background: "#ffffff",
+                            }}
+                        />
+                        <small style={{ color: "#6b7280", fontSize: "12px" }}>The maximum limit for the daily users list size.</small>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <label style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>UPI Payment Gateway</label>
+                        <select
+                            value={upiGateway}
+                            onChange={(e) => setUpiGateway(e.target.value)}
+                            style={{
+                                padding: "10px 14px",
+                                borderRadius: "8px",
+                                border: "1px solid #d1d5db",
+                                fontSize: "14px",
+                                outline: "none",
+                                background: "#ffffff",
+                                color: "#111827",
+                                width: "100%",
+                            }}
+                        >
+                            <option value="Enabled" style={{ color: "#111827", background: "#ffffff" }}>Enabled</option>
+                            <option value="Disabled" style={{ color: "#111827", background: "#ffffff" }}>Disabled</option>
+                        </select>
+                        <small style={{ color: "#6b7280", fontSize: "12px" }}>Enable or disable online UPI payment options for users.</small>
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        style={{
+                            marginTop: "10px",
+                            padding: "12px",
+                            background: "#0b63f6",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "8px",
+                            fontSize: "14px",
+                            fontWeight: "600",
+                            cursor: saving ? "not-allowed" : "pointer",
+                            opacity: saving ? 0.7 : 1,
+                            transition: "background 0.2s"
+                        }}
+                        onMouseOver={(e) => e.target.style.background = "#0953cf"}
+                        onMouseOut={(e) => e.target.style.background = "#0b63f6"}
+                    >
+                        {saving ? "Saving Settings..." : "Save Settings"}
                     </button>
                 </form>
             </div>

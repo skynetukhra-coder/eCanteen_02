@@ -41,6 +41,10 @@ function PaymentSuccess() {
             localStorage.getItem("user")
         );
 
+    const category = location.state?.category || (cartItems[0]?.category || "Lunch");
+    const mealType = location.state?.mealType || "";
+    const isTiffin = mealType.toLowerCase() === "tiffin" || category.toLowerCase() === "tiffin";
+
     const [loading, setLoading] =
         useState(true);
 
@@ -162,18 +166,33 @@ function PaymentSuccess() {
 
                         {user?.role === "ADMIN" ? (
                             <>
-                                <button
-                                    className="coupon-btn"
-                                    onClick={() => {
-                                        window.print();
-                                        sessionStorage.removeItem("orderCreated");
-                                        navigate("/home");
-                                    }}
-                                    style={{ background: "#7c3aed" }}
-                                >
-                                    <FaPrint />
-                                    Print Coupon
-                                </button>
+                                {!isTiffin && (
+                                    <button
+                                        className="coupon-btn"
+                                        onClick={() => {
+                                            window.print();
+                                            sessionStorage.removeItem("orderCreated");
+                                            navigate("/home");
+                                        }}
+                                        style={{ background: "#7c3aed" }}
+                                    >
+                                        <FaPrint />
+                                        Print Coupon
+                                    </button>
+                                )}
+                                {isTiffin && (
+                                    <button
+                                        className="coupon-btn"
+                                        onClick={() => {
+                                            sessionStorage.removeItem("orderCreated");
+                                            navigate("/orders");
+                                        }}
+                                        style={{ background: "#10b981" }}
+                                    >
+                                        <FaClipboardList />
+                                        View Orders
+                                    </button>
+                                )}
                                 <button
                                     className="home-btn"
                                     onClick={() => {
@@ -186,16 +205,31 @@ function PaymentSuccess() {
                             </>
                         ) : (
                             <>
-                                <button
-                                    className="coupon-btn"
-                                    onClick={() => {
-                                        sessionStorage.removeItem("orderCreated");
-                                        navigate("/coupons");
-                                    }}
-                                >
-                                    <FaTicketAlt />
-                                    Generate Coupon
-                                </button>
+                                {!isTiffin && (
+                                    <button
+                                        className="coupon-btn"
+                                        onClick={() => {
+                                            sessionStorage.removeItem("orderCreated");
+                                            navigate("/coupons");
+                                        }}
+                                    >
+                                        <FaTicketAlt />
+                                        Generate Coupon
+                                    </button>
+                                )}
+                                {isTiffin && (
+                                    <button
+                                        className="coupon-btn"
+                                        onClick={() => {
+                                            sessionStorage.removeItem("orderCreated");
+                                            navigate("/orders");
+                                        }}
+                                        style={{ background: "#10b981" }}
+                                    >
+                                        <FaClipboardList />
+                                        View Orders
+                                    </button>
+                                )}
                                 <button
                                     className="home-btn"
                                     onClick={() => {

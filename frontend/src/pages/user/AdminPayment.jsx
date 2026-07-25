@@ -152,7 +152,9 @@ function AdminPayment() {
 
                                 setIsProcessing(true);
                                 try {
-                                    const category = cartItems[0]?.category || "Lunch";
+                                    const category = location.state?.mealType
+                                        ? (location.state.mealType.charAt(0).toUpperCase() + location.state.mealType.slice(1).toLowerCase())
+                                        : (cartItems[0]?.category || "Lunch");
                                     const orderPayload = {
                                         employee_id: user.employee_id,
                                         category,
@@ -199,26 +201,42 @@ function AdminPayment() {
                                         }
                                     });
 
-                                    // 4. Navigate to admin coupon page
+                                    // 4. Navigate to success page for Tiffin or admin coupon page for other categories
                                     const now = new Date();
-                                    navigate("/admin-coupon", {
-                                        state: {
-                                            cartItems,
-                                            totalItems,
-                                            totalAmount,
-                                            paymentMethod,
-                                            user,
-                                            orderDetails: {
-                                                orderId: `ORD${order_id}`,
-                                                meal: cartItems.map(item => `${item.name} x ${item.selectedQty}`).join(", "),
-                                                amount: `₹${totalAmount}`,
-                                                paymentMode: paymentMethod,
-                                                date: now.toLocaleDateString(),
-                                                time: now.toLocaleTimeString(),
-                                                couponCode: coupon_code
+                                    if (category.toLowerCase() === "tiffin") {
+                                        navigate("/paymentsuccess", {
+                                            state: {
+                                                cartItems,
+                                                totalItems,
+                                                totalAmount,
+                                                paymentMethod,
+                                                user,
+                                                verifiedOrderId: order_id,
+                                                couponCode: coupon_code,
+                                                category,
+                                                mealType: location.state?.mealType
                                             }
-                                        }
-                                    });
+                                        });
+                                    } else {
+                                        navigate("/admin-coupon", {
+                                            state: {
+                                                cartItems,
+                                                totalItems,
+                                                totalAmount,
+                                                paymentMethod,
+                                                user,
+                                                orderDetails: {
+                                                    orderId: `ORD${order_id}`,
+                                                    meal: cartItems.map(item => `${item.name} x ${item.selectedQty}`).join(", "),
+                                                    amount: `₹${totalAmount}`,
+                                                    paymentMode: paymentMethod,
+                                                    date: now.toLocaleDateString(),
+                                                    time: now.toLocaleTimeString(),
+                                                    couponCode: coupon_code
+                                                }
+                                            }
+                                        });
+                                    }
                                 } catch (err) {
                                     console.error("Admin checkout error:", err);
                                     alert(err.response?.data?.message || "Error processing admin order.");
@@ -227,7 +245,7 @@ function AdminPayment() {
                                 }
                             }}
                         >
-                            {isProcessing ? "Processing..." : "Proceed to Generate Coupon"}
+                            {isProcessing ? "Processing..." : (location.state?.mealType?.toLowerCase() === "tiffin" ? "Proceed to Pay" : "Proceed to Generate Coupon")}
                         </button>
                     </div>
                 </div>

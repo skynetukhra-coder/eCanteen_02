@@ -92,7 +92,7 @@ router.post("/create", async (req, res) => {
             )
             VALUES
             (?, ?, ?, ?, 'SUCCESS',
-            'COUPON_GENERATED',
+            ?,
             ?, ?, ?)
             `,
             [
@@ -100,6 +100,7 @@ router.post("/create", async (req, res) => {
                 category,
                 total_amount,
                 payment_mode,
+                (category && category.toLowerCase() === 'tiffin') ? 'REDEEMED' : 'COUPON_GENERATED',
                 couponCode,
                 qrCodePath,
                 checkout_token || null

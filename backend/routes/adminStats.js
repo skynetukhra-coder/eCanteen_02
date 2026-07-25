@@ -5,7 +5,7 @@ const db = require("../config/db");
 // GET DYNAMIC DASHBOARD METRICS AND DATA
 router.get("/dashboard", async (req, res) => {
     try {
-        const today = new Date().toISOString().split("T")[0];
+        const today = req.query.date || new Date().toISOString().split("T")[0];
 
         // 1. Total Users
         const [userRow] = await db.query("SELECT COUNT(*) AS total FROM employee");
@@ -60,11 +60,27 @@ router.get("/dashboard", async (req, res) => {
             else if (h === "06 PM") { startHour = 18; endHour = 20; }
             else { startHour = 20; endHour = 22; }
 
-            const [hourRow] = await db.query(
-                "SELECT COUNT(*) AS total FROM orders WHERE DATE(created_at) = ? AND HOUR(created_at) >= ? AND HOUR(created_at) < ?",
+            const [hourRows] = await db.query(
+                "SELECT category, COUNT(*) AS total FROM orders WHERE DATE(created_at) = ? AND HOUR(created_at) >= ? AND HOUR(created_at) < ? GROUP BY category",
                 [today, startHour, endHour]
             );
-            orderTrend.push({ time: h, orders: hourRow[0].total });
+            let breakfast = 0, lunch = 0, tiffin = 0, dinner = 0, total = 0;
+            hourRows.forEach(row => {
+                const cat = row.category?.toLowerCase();
+                if (cat === "breakfast") breakfast += row.total;
+                else if (cat === "lunch") lunch += row.total;
+                else if (cat === "tiffin" || cat === "snacks") tiffin += row.total;
+                else if (cat === "dinner") dinner += row.total;
+                total += row.total;
+            });
+            orderTrend.push({
+                time: h,
+                orders: total,
+                Breakfast: breakfast,
+                Lunch: lunch,
+                Tiffin: tiffin,
+                Dinner: dinner
+            });
         }
 
         // 8. Meal Distribution today (Breakfast, Lunch, Snacks, etc.)
@@ -112,9 +128,10 @@ router.get("/dashboard", async (req, res) => {
                 o.payment_mode AS payment
             FROM orders o
             JOIN employee e ON e.employee_id = o.employee_id
+            WHERE DATE(o.created_at) = ?
             ORDER BY o.order_id DESC
             LIMIT 5
-        `);
+        `, [today]);
 
         // 10. Live activities feed
         const [activityRows] = await db.query(`
@@ -124,9 +141,10 @@ router.get("/dashboard", async (req, res) => {
                 DATE_FORMAT(created_at, '%h:%i %p') AS time,
                 severity
             FROM audit_logs
+            WHERE DATE(created_at) = ?
             ORDER BY log_id DESC
             LIMIT 5
-        `);
+        `, [today]);
 
         res.json({
             success: true,

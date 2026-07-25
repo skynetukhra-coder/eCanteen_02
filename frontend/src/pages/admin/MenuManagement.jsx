@@ -24,7 +24,7 @@ function MenuManagement({ searchQuery = "" }) {
     const [tempSlots, setTempSlots] = useState({
         breakfast: { start_time: "", end_time: "" },
         lunch: { start_time: "", end_time: "" },
-        snacks: { start_time: "", end_time: "" }
+        tiffin: { start_time: "", end_time: "" }
     });
 
     // Helper to convert 12-hour (e.g. "06:00 AM") to 24-hour (e.g. "06:00")
@@ -360,6 +360,8 @@ function MenuManagement({ searchQuery = "" }) {
                                 const printWindow = window.open("", "_blank");
                                 const filteredItems = (Array.isArray(reportData) ? reportData : []).filter(
                                     (item) => item.category === activeMeal &&
+                                    item.is_active === "ACTIVE" &&
+                                    (item.issued && Number(item.issued) > 0) &&
                                     (!searchQuery || item.item_name.toLowerCase().includes(searchQuery.toLowerCase()))
                                 );
                                 
@@ -435,6 +437,8 @@ function MenuManagement({ searchQuery = "" }) {
 
                                 const filteredItems = (Array.isArray(reportData) ? reportData : []).filter(
                                     (item) => item.category === activeMeal &&
+                                    item.is_active === "ACTIVE" &&
+                                    (item.issued && Number(item.issued) > 0) &&
                                     (!searchQuery || item.item_name.toLowerCase().includes(searchQuery.toLowerCase()))
                                 );
                                 

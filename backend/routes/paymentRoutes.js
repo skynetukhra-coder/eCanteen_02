@@ -99,12 +99,13 @@ router.post("/verify-online", async (req, res) => {
             const [orderResult] = await db.query(
                 `INSERT INTO orders 
                 (employee_id, category, total_amount, payment_mode, payment_status, order_status, coupon_code, qr_code_path) 
-                VALUES (?, ?, ?, ?, 'SUCCESS', 'COUPON_GENERATED', ?, ?)`,
+                VALUES (?, ?, ?, ?, 'SUCCESS', ?, ?, ?)`,
                 [
                     order_payload.employee_id,
                     order_payload.category,
                     order_payload.total_amount,
                     order_payload.payment_mode,
+                    (order_payload.category && order_payload.category.toLowerCase() === 'tiffin') ? 'REDEEMED' : 'COUPON_GENERATED',
                     order_payload.coupon_code,
                     `/qr/${order_payload.coupon_code}.png`
                 ]

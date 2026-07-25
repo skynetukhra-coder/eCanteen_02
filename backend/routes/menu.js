@@ -16,7 +16,7 @@ router.get("/slots/all", async (req, res) => {
 // UPDATE MEAL TIME SLOTS
 router.post("/slots/update", async (req, res) => {
     try {
-        const { breakfast, lunch, snacks, slots } = req.body;
+        const { breakfast, lunch, snacks, tiffin, slots } = req.body;
         if (slots && Array.isArray(slots)) {
             for (const slot of slots) {
                 await db.query(
@@ -33,6 +33,9 @@ router.post("/slots/update", async (req, res) => {
             }
             if (snacks) {
                 await db.query("UPDATE meal_time_slots SET start_time = ?, end_time = ? WHERE LOWER(category) = 'snacks'", [snacks.start_time, snacks.end_time]);
+            }
+            if (tiffin) {
+                await db.query("UPDATE meal_time_slots SET start_time = ?, end_time = ? WHERE LOWER(category) = 'tiffin'", [tiffin.start_time, tiffin.end_time]);
             }
         }
         res.json({ success: true, message: "Meal time slots updated successfully!" });

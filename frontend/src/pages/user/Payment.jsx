@@ -86,7 +86,9 @@ function Payment() {
 
             setIsProcessing(true);
             try {
-                const category = cartItems[0]?.category || "Lunch";
+                const category = location.state?.mealType
+                    ? (location.state.mealType.charAt(0).toUpperCase() + location.state.mealType.slice(1).toLowerCase())
+                    : (cartItems[0]?.category || "Lunch");
                 const orderPayload = {
                     employee_id: user.employee_id,
                     category,
@@ -142,7 +144,9 @@ function Payment() {
                         paymentMethod,
                         user,
                         verifiedOrderId: order_id,
-                        couponCode: coupon_code
+                        couponCode: coupon_code,
+                        category,
+                        mealType: location.state?.mealType
                     }
                 });
             } catch (err) {
@@ -185,7 +189,9 @@ function Payment() {
                 handler: async function (response) {
                     try {
                         const coupon_code = "CPN" + Date.now();
-                        const category = cartItems[0]?.category || "Lunch";
+                        const category = location.state?.mealType
+                            ? (location.state.mealType.charAt(0).toUpperCase() + location.state.mealType.slice(1).toLowerCase())
+                            : (cartItems[0]?.category || "Lunch");
                         const order_payload = {
                             employee_id: user.employee_id,
                             category,
@@ -216,7 +222,9 @@ function Payment() {
                                     totalAmount,
                                     paymentMethod,
                                     user,
-                                    verifiedOrderId: verifyRes.data.order_id
+                                    verifiedOrderId: verifyRes.data.order_id,
+                                    category,
+                                    mealType: location.state?.mealType
                                 }
                             });
                         } else {
