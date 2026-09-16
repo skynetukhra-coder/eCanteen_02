@@ -108,8 +108,67 @@ function Coupon() {
                     ) : (
                         <div className="coupons-list" style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
                             {activeCoupons.map((coupon) => (
-                                <div className="coupon-card" key={coupon.order_id} style={{ margin: 0 }}>
-                                    {coupon.order_status === "PENDING_APPROVAL" ? (
+                                <div
+                                    className="coupon-card"
+                                    key={coupon.order_id}
+                                    style={{
+                                        margin: 0,
+                                        border: coupon.order_status === "CANCELLED" ? "1.5px solid #fca5a5" : undefined,
+                                        background: coupon.order_status === "CANCELLED" ? "#fffafa" : undefined
+                                    }}
+                                >
+                                    {coupon.order_status === "CANCELLED" ? (
+                                        <>
+                                            <div style={{ textAlign: "center", padding: "10px 0" }}>
+                                                <div style={{ fontSize: "40px", color: "#ef4444", marginBottom: "8px" }}>❌</div>
+                                                <h3 style={{ color: "#dc2626", margin: "0 0 6px 0" }}>Order Cancelled</h3>
+                                                <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>
+                                                    This order has been cancelled by the canteen administration. No meal coupon will be issued.
+                                                </p>
+                                            </div>
+
+                                            <div className="coupon-details" style={{ marginTop: "15px" }}>
+                                                <div className="detail-row">
+                                                    <span>Order ID</span>
+                                                    <strong style={{ color: "#dc2626", fontSize: "15px" }}>ORD{coupon.order_id}</strong>
+                                                </div>
+                                                <div className="detail-row">
+                                                    <span>Items</span>
+                                                    <strong>{coupon.items || "Meal Items"}</strong>
+                                                </div>
+                                                <div className="detail-row">
+                                                    <span>Amount</span>
+                                                    <strong>₹{parseFloat(coupon.total_amount).toFixed(2)}</strong>
+                                                </div>
+                                                <div className="detail-row">
+                                                    <span>Date</span>
+                                                    <strong>{new Date(coupon.created_at).toLocaleDateString()}</strong>
+                                                </div>
+                                                <div className="detail-row">
+                                                    <span>Status</span>
+                                                    <strong style={{ color: "#dc2626", background: "#fee2e2", padding: "4px 12px", borderRadius: "20px", fontWeight: "700" }}>CANCELLED</strong>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ marginTop: "15px", textAlign: "center" }}>
+                                                <button
+                                                    onClick={() => navigate("/orders")}
+                                                    style={{
+                                                        background: "#f1f5f9",
+                                                        border: "1px solid #cbd5e1",
+                                                        color: "#475569",
+                                                        padding: "8px 16px",
+                                                        borderRadius: "8px",
+                                                        fontSize: "13px",
+                                                        fontWeight: "600",
+                                                        cursor: "pointer"
+                                                    }}
+                                                >
+                                                    View in Order History
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : coupon.order_status === "PENDING_APPROVAL" ? (
                                         <>
                                             <div style={{ textAlign: "center", padding: "10px 0" }}>
                                                 <div style={{ fontSize: "40px", color: "#d97706", marginBottom: "8px" }}>⏳</div>

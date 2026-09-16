@@ -115,8 +115,16 @@ app.use((req, res) => {
 });
 
 db.getConnection()
-    .then(conn => {
+    .then(async conn => {
         console.log("✅ MySQL Connected");
+        try {
+            await conn.query("ALTER TABLE orders MODIFY COLUMN order_status VARCHAR(50) DEFAULT 'COUPON_GENERATED'");
+            await conn.query("ALTER TABLE orders MODIFY COLUMN payment_status VARCHAR(50) DEFAULT 'PENDING'");
+            await conn.query("ALTER TABLE payments MODIFY COLUMN payment_status VARCHAR(50) DEFAULT 'PENDING'");
+            console.log("✅ Database status columns verified and upgraded to VARCHAR(50)");
+        } catch (schemaErr) {
+            console.warn("⚠️ Schema column check notice:", schemaErr.message);
+        }
         conn.release();
     })
     .catch(err => {

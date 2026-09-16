@@ -324,10 +324,22 @@ router.post("/create", async (req, res) => {
             );
 
             // Update order status to PENDING_APPROVAL so coupon is held until admin approval
-            await db.query(
-                "UPDATE orders SET payment_status = 'PENDING', order_status = 'PENDING_APPROVAL' WHERE order_id = ?",
-                [order_id]
-            );
+            try {
+                await db.query(
+                    "UPDATE orders SET payment_status = 'PENDING', order_status = 'PENDING_APPROVAL' WHERE order_id = ?",
+                    [order_id]
+                );
+            } catch (statusErr) {
+                if (statusErr.code === 'WARN_DATA_TRUNCATED' || statusErr.errno === 1265) {
+                    await db.query("ALTER TABLE orders MODIFY COLUMN order_status VARCHAR(50) DEFAULT 'COUPON_GENERATED'").catch(() => {});
+                    await db.query(
+                        "UPDATE orders SET payment_status = 'PENDING', order_status = 'PENDING_APPROVAL' WHERE order_id = ?",
+                        [order_id]
+                    );
+                } else {
+                    throw statusErr;
+                }
+            }
         }
 
         await db.query(
@@ -468,14 +480,42 @@ router.post("/update-status", async (req, res) => {
                 message: "Payment approved successfully! Food coupon generated for user."
             });
         } else if (action === "CANCEL") {
-            await db.query(
-                "UPDATE payments SET payment_status = 'CANCELLED' WHERE payment_id = ?",
-                [payment_id]
-            );
-            await db.query(
-                "UPDATE orders SET payment_status = 'FAILED', order_status = 'CANCELLED' WHERE order_id = ?",
-                [rawOrderId]
-            );
+            try {
+                await db.query(
+                    "UPDATE payments SET payment_status = 'CANCELLED' WHERE payment_id = ?",
+                    [payment_id]
+                );
+            } catch (payErr) {
+                if (payErr.code === 'WARN_DATA_TRUNCATED' || payErr.errno === 1265) {
+                    await db.query("ALTER TABLE payments MODIFY COLUMN payment_status VARCHAR(50) DEFAULT 'PENDING'").catch(() => {});
+                    await db.query(
+                        "UPDATE payments SET payment_status = 'CANCELLED' WHERE payment_id = ?",
+                        [payment_id]
+                    ).catch(async () => {
+                        await db.query("UPDATE payments SET payment_status = 'FAILED' WHERE payment_id = ?", [payment_id]);
+                    });
+                } else {
+                    throw payErr;
+                }
+            }
+
+            try {
+                await db.query(
+                    "UPDATE orders SET payment_status = 'FAILED', order_status = 'CANCELLED' WHERE order_id = ?",
+                    [rawOrderId]
+                );
+            } catch (ordErr) {
+                if (ordErr.code === 'WARN_DATA_TRUNCATED' || ordErr.errno === 1265) {
+                    await db.query("ALTER TABLE orders MODIFY COLUMN order_status VARCHAR(50) DEFAULT 'COUPON_GENERATED'").catch(() => {});
+                    await db.query("ALTER TABLE orders MODIFY COLUMN payment_status VARCHAR(50) DEFAULT 'PENDING'").catch(() => {});
+                    await db.query(
+                        "UPDATE orders SET payment_status = 'FAILED', order_status = 'CANCELLED' WHERE order_id = ?",
+                        [rawOrderId]
+                    );
+                } else {
+                    throw ordErr;
+                }
+            }
 
             // Restock menu items for cancelled order
             const [items] = await db.query(

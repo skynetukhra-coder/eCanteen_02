@@ -316,13 +316,17 @@ router.get(
                     o.total_amount,
                     o.order_status,
                     o.created_at,
+                    o.updated_at,
                     e.employee_id,
                     e.full_name,
                     GROUP_CONCAT(CONCAT(oi.item_name, '*', oi.quantity) SEPARATOR ', ') AS items
                 FROM orders o
                 JOIN employee e ON e.employee_id = o.employee_id
                 LEFT JOIN order_items oi ON oi.order_id = o.order_id
-                WHERE o.employee_id = ? AND o.order_status IN ('COUPON_GENERATED', 'PENDING_APPROVAL')
+                WHERE o.employee_id = ? AND (
+                    o.order_status IN ('COUPON_GENERATED', 'PENDING_APPROVAL')
+                    OR (o.order_status = 'CANCELLED' AND (o.updated_at >= NOW() - INTERVAL 2 DAY OR o.created_at >= NOW() - INTERVAL 2 DAY))
+                )
                 GROUP BY o.order_id
                 ORDER BY o.order_id DESC
                 `,

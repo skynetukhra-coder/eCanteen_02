@@ -344,7 +344,7 @@ router.get("/stats", async (req, res) => {
         const [todayRow] = await db.query(`
             SELECT IFNULL(SUM(amount), 0.00) AS total 
             FROM wallet_transactions 
-            WHERE type = 'credit' AND DATE(created_at) = CURDATE()
+            WHERE type = 'credit' AND status = 'SUCCESS' AND DATE(created_at) = CURDATE()
         `);
         const todayRecharges = parseFloat(todayRow[0].total);
 
@@ -355,6 +355,7 @@ router.get("/stats", async (req, res) => {
                 IFNULL(SUM(amount), 0.00) AS amount
             FROM wallet_transactions 
             WHERE type = 'credit' 
+              AND status = 'SUCCESS'
               AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) 
             GROUP BY DATE(created_at) 
             ORDER BY DATE(created_at) ASC
@@ -656,6 +657,17 @@ router.post("/cancel-user-recharge", async (req, res) => {
         const tx = txRows[0];
         const [empRows] = await db.query("SELECT username, full_name FROM employee WHERE employee_id = ?", [tx.employee_id]);
         const empInfo = empRows[0] ? `${empRows[0].full_name} (${empRows[0].username})` : `ID ${tx.employee_id}`;
+
+        // If the transaction was previously approved (SUCCESS), deduct the amount from wallet balance
+        if (tx.status === "SUCCESS") {
+            const [walletRows] = await db.query("SELECT balance FROM wallets WHERE employee_id = ?", [tx.employee_id]);
+            if (walletRows.length > 0) {
+                const currentBalance = parseFloat(walletRows[0].balance);
+                const newBalance = Math.max(0, currentBalance - parseFloat(tx.amount));
+                const newSig = generateWalletSignature(tx.employee_id, newBalance);
+                await db.query("UPDATE wallets SET balance = ?, signature = ? WHERE employee_id = ?", [newBalance, newSig, tx.employee_id]);
+            }
+        }
 
         await db.query(
             "UPDATE wallet_transactions SET status = 'CANCELLED' WHERE transaction_id = ?",
